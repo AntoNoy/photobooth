@@ -1,114 +1,122 @@
 import { Injectable } from '@nestjs/common';
 import { GPhoto2 } from 'gphoto2';
 import { SocketService } from 'src/socket/socket.service';
-import { ModeEnum, StatusService } from 'src/status/status.service';
+import { PagesEnum, SettingsService } from 'src/status/settings.service';
 import { writeFile, readFile } from 'fs/promises';
+import { BehaviorSubject } from 'rxjs';
+
+export enum CameraStatusEnum {
+    DISCONNECTED = 'disconnected', 
+    CONNECTED = 'connected',
+    PREVIEW = 'preview',
+    PICTURE = 'picture',
+}
 
 @Injectable()
 export class CameraService {
 
-    private gphoto: GPhoto2;
-    private mode: ModeEnum;
-    private camera: any; 
+    private status = new BehaviorSubject<CameraStatusEnum>(CameraStatusEnum.DISCONNECTED);
+    private camera: any;
 
     constructor(
         private socketService: SocketService,
-        private statusService: StatusService,
+        private settingsService: SettingsService,
     ) {
-        this.statusService.mode.subscribe(async (mode) => {
-            this.config(mode);
+        this.settingsService.page.subscribe(async (status) => {
+            this.command(status);
         })
 
-        this.openInstance()
+        this.initCamera()
     }
 
-    checkInstance(){
-        if (!this.camera) {
-            this.openInstance()
-        } else {
+    async initCamera(): Promise<void> {
+        if (this.camera) {
             console.log('camera already open', this.camera)
-        }
-    }
-
-    openInstance(){
-        this.gphoto = new GPhoto2();
-        this.gphoto.setLogLevel(1);
-        this.gphoto.on("log", function (level, domain, message) {
-            console.log(domain, message);
-        });
-        this.gphoto.list(async (list) => {
-            if (list.length === 0) {
-                console.log("no camera detected")
-                return
-            };
-            console.log(list[0]);
-            this.camera = list[0];
-
-            this.statusService.mode.next(ModeEnum.STANDBY);
-        })
-    }
-
-    async config(mode: ModeEnum) {
-        console.log('mode wanted', mode)
-        if(mode === this.mode) return;
-        
-        if (!this.camera) {
-            mode !== ModeEnum.DISCONNECTED &&
-            this.statusService.mode.next(ModeEnum.DISCONNECTED);
             return;
         }
+        const gphoto = new GPhoto2();
+        gphoto.setLogLevel(1);
+        gphoto.on("log", function (level, domain, message) {
+            console.log(domain, message);
+        });
 
-        this.mode = mode
+        return new Promise<void>((res, rej) => {
+            gphoto.list((list) => {
+                if (list.length === 0) {
+                    res()
+                    console.log("no camera detected")
+                    return
+                };
+                
+                console.log(list[0]);
+                this.camera = list[0];
+                this.status.next(CameraStatusEnum.CONNECTED);
+                res()
+            })
+        })
+    }
 
-        switch (mode) {
-            case ModeEnum.PREVIEW:
-                console.log('mode preview', mode)
+    async command(status: PagesEnum) {
+        console.log('status wanted', status)
+        if (!this.camera) {
+            console.log('no camera')
+            if (this.status.value !== CameraStatusEnum.DISCONNECTED) {
+                this.status.next(CameraStatusEnum.DISCONNECTED);
+                this.initCamera()
+                return
+            }
+        }
+
+        switch (status) {
+            case PagesEnum.PREVIEW:
+                if(this.status.value === CameraStatusEnum.PREVIEW) return;
+                this.status.next(CameraStatusEnum.PREVIEW);
                 await this.getPreview();
-                this.statusService.mode.next(ModeEnum.WAITING);
                 break;
-            case ModeEnum.PICTURE:
-                console.log('mode capture', mode)
-                await this.takePicure();
-                this.statusService.mode.next(ModeEnum.WAITING);
+            case PagesEnum.PICTURE:
+                this.status.next(CameraStatusEnum.PICTURE);
+                const picture = await this.takePicure();
+                this.settingsService.addPicture(picture);
                 break;
-            case ModeEnum.DISCONNECTED:
-                console.log('mode disconnected', mode)
+            default:
                 break;
         }
+        console.log('status :', status)
+        this.status.next(CameraStatusEnum.CONNECTED);
     }
 
     async getPreview() {
-            while (this.mode === ModeEnum.PREVIEW) {
-                await this.takePreview();
-                await waiting();
-            }
+        while (this.status.value === CameraStatusEnum.PREVIEW) {
+            await this.takePreview();
+            await waiting();
+        }
     };
 
-    private takePicure() {
+    private takePicure(): Promise<string> {
         try {
             return new Promise((res, rej) => {
                 console.log('takePicure')
                 this.camera.takePicture(
                     {
-                        download: true 
+                        download: true
                     },
-                    async (er, data) => { 
+                    async (er, data) => {
                         if (er) {
                             console.log("----er----", er);
-                            rej(false);
+                            rej(er);
                             return;
                         }
-                        console.log("data", data);
+                        const filePath = this.settingsService.pictureFolder + new Date().toISOString() + ".jpg";
+                        await writeFile(filePath, data)
 
-                        await writeFile(this.statusService.pictureFolder + new Date().toISOString() + ".jpg", data)
                         this.socketService.socket.emit("image", { data: Buffer.from(data).toString("base64") });
-
-                        res(true);
+                        res(filePath);
                     }
                 );
             });
         } catch (e) {
             console.log("error", e);
+            this.command(PagesEnum.WAITING)
         }
     }
 
@@ -118,7 +126,7 @@ export class CameraService {
                 this.camera.takePicture(
                     {
                         preview: true,
-                        targetPath: this.statusService.previewFolder +'preview.XXXXXX'
+                        targetPath: this.settingsService.previewFolder + 'preview.XXXXXX'
                     },
                     async (er, tmpname) => {
                         if (er) {

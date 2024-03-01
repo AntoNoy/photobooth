@@ -1,22 +1,20 @@
 import { Controller, Get, Param, Res } from '@nestjs/common';
-import { AppService } from './app.service';
 import { Response } from 'express';
-import { ModeEnum, StatusService } from './status/status.service';
+import { PagesEnum, SettingsService } from './status/settings.service';
 
 @Controller()
 export class AppController {
   constructor(
-    private readonly appService: AppService,
-    private readonly statusService: StatusService,
+    private readonly settingsService: SettingsService,
     ) { }
 
-  @Get()
-  getPage(@Res() res: Response) {
-    res.sendFile(__dirname + '/assets/index.html');
+  @Get(':page')
+  getPage(@Res() res: Response, @Param('page') page: string) {
+    res.sendFile(`${__dirname}/assets/${page}.html`);
   }
 
   @Get('cmd/:cmd')
-  getControl(@Param('cmd') cmd: ModeEnum) {
-    this.statusService.mode.next(cmd);
+  getControl(@Param('cmd') cmd: PagesEnum) {
+    this.settingsService.page.next(cmd);
   }
 }

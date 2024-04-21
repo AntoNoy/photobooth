@@ -64,7 +64,7 @@ export class SettingsService {
             await Promise.all(files.map(file =>
                 unlink(this.previewFolder + file),
             ));
-
+            
         } catch (err) {
             console.log(err);
         }

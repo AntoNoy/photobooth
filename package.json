@@ -26,6 +26,7 @@
     "@nestjs/platform-socket.io": "^10.3.3",
     "@nestjs/websockets": "^10.3.3",
     "gphoto2": "^0.3.2",
+    "canvas": "^2.11.2",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
     "socket.io": "^4.7.4"

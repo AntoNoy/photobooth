@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Res } from '@nestjs/common';
 import { Response } from 'express';
-import { PagesEnum, SettingsService } from './status/settings.service';
+import { PagesEnum, SettingsService } from './settings/settings.service';
 
 @Controller()
 export class AppController {

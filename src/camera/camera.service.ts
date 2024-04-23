@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { GPhoto2 } from 'gphoto2';
 import { SocketService } from 'src/socket/socket.service';
-import { PagesEnum, SettingsService } from 'src/status/settings.service';
+import { PagesEnum, SettingsService } from 'src/settings/settings.service';
 import { writeFile, readFile } from 'fs/promises';
 import { BehaviorSubject } from 'rxjs';
 

@@ -5,4 +5,4 @@ import { SettingsService } from './settings.service';
   providers: [SettingsService],
   exports: [SettingsService],
 })
-export class StatusModule {}
+export class SettingsModule {}

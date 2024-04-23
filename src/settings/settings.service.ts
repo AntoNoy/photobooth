@@ -23,6 +23,12 @@ export class Session {
     pictureModel: "x1" | "x3" = "x1";
 }
 
+export enum PicturesType {
+    PREVIEW = 'preview',
+    PRINT = 'print',
+    GIFT = 'gift',
+}
+
 @Injectable()
 export class SettingsService {
 
